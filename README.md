@@ -52,7 +52,7 @@ type: custom:bambu-lab-dashboard
   - `light`: Kammerlicht
   - `switch`: Kamera-/Bildmodus und Hinweistöne, sofern vorhanden
 - Optionales zweites `light.*`-Licht pro Drucker, im Karteneditor über ein Dropdown auswählbar und in den Quick Controls als „Licht 2“ steuerbar.
-- Optionaler Idle-Shutdown-Helper (`input_boolean`), in den Quick Controls mit Timer-Status und EIN/AUS-Anzeige steuerbar.
+- Optionaler Idle-Shutdown-Helper (`input_boolean`), im Energie-Reiter neben der Smart-Steckdose mit Timer-Status und EIN/AUS-Anzeige steuerbar.
 - Externe Smart-Steckdose als `switch.*` pro Drucker, inklusive EIN/AUS und Sicherheitsabfrage beim Ausschalten während eines Drucks.
 - Leistungs- und Energiesensoren frei zuordnen.
 - Wartungsplan pro Drucker mit quittierbaren Aufgaben und Wartungsbuch.

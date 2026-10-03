@@ -723,6 +723,10 @@ const styles = `
   .select-wrap { padding:0 17px 17px; }
   .select-wrap select { width:100%; min-height:42px; border-radius:12px; color:var(--bd-text); background:#0b120e; border:1px solid var(--bd-border); padding:0 10px; }
   .energy-body { padding:14px 17px 17px; }
+  .energy-controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-bottom:12px; }
+  .energy-controls .smart-plug { min-width:0; margin:0; }
+  .energy-controls .smart-plug > div { min-width:0; overflow-wrap:anywhere; }
+  .energy-controls .control-btn { flex:0 0 auto; white-space:nowrap; }
   .energy-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; }
   .energy-stat { padding:11px; border-radius:13px; border:1px solid rgba(255,255,255,.045); background:rgba(255,255,255,.02); }
   .energy-stat small { color:var(--bd-muted); display:block; font-size:9px; letter-spacing:.07em; text-transform:uppercase; }
@@ -775,6 +779,7 @@ const styles = `
     .right .camera-panel { grid-column:auto; }
     .spools { grid-template-columns:repeat(2,minmax(0,1fr)); }
     .energy-stats { grid-template-columns:1fr 1fr; }
+    .energy-controls { grid-template-columns:1fr; }
     .energy-stat:last-child { grid-column:span 2; }
     .metric-grid { grid-template-columns:1fr 1fr; }
     .editor-row { grid-template-columns:1fr; }
@@ -1612,13 +1617,11 @@ class BambuLabDashboard extends HTMLElement {
   _renderControls(printer) {
     const ce=(key)=>this._controlEntity(printer,key);
     const state=(r)=>r?.entity_id?this._hass?.states?.[r.entity_id]:null;
-    const idleShutdown=ce("idleShutdown");
-    const idleOn=normalize(state(idleShutdown)?.state)==="on";
     const chamberLight=ce("chamberLight");
     const secondaryChamberLight=ce("secondaryChamberLight");
     const chamberLightOn=normalize(state(chamberLight)?.state)==="on";
     const secondaryChamberLightOn=normalize(state(secondaryChamberLight)?.state)==="on";
-    const buttons=[[ce("pause"),"mdi:pause","Pause",false],[ce("resume"),"mdi:play","Fortsetzen",false],[ce("stop"),"mdi:stop","Stop",true],[chamberLight,chamberLightOn?"mdi:lightbulb":"mdi:lightbulb-off","Licht",false,chamberLightOn,chamberLightOn?"EIN":"AUS"],[secondaryChamberLight,secondaryChamberLightOn?"mdi:lightbulb":"mdi:lightbulb-off","Licht 2",false,secondaryChamberLightOn,secondaryChamberLightOn?"EIN":"AUS"],[idleShutdown,idleOn?"mdi:timer":"mdi:timer-off",`Leerlaufabschaltung ${idleOn?"EIN":"AUS"}`,false],[ce("buzzerSilence"),"mdi:alarm-light-off-outline","Alarm aus",false],[ce("buzzerBeep"),"mdi:alarm-light-outline","Signalton",false]].filter(([r])=>r?.entity_id);
+    const buttons=[[ce("pause"),"mdi:pause","Pause",false],[ce("resume"),"mdi:play","Fortsetzen",false],[ce("stop"),"mdi:stop","Stop",true],[chamberLight,chamberLightOn?"mdi:lightbulb":"mdi:lightbulb-off","Licht",false,chamberLightOn,chamberLightOn?"EIN":"AUS"],[secondaryChamberLight,secondaryChamberLightOn?"mdi:lightbulb":"mdi:lightbulb-off","Licht 2",false,secondaryChamberLightOn,secondaryChamberLightOn?"EIN":"AUS"],[ce("buzzerSilence"),"mdi:alarm-light-off-outline","Alarm aus",false],[ce("buzzerBeep"),"mdi:alarm-light-outline","Signalton",false]].filter(([r])=>r?.entity_id);
     const switches=[[ce("cameraSwitch"),"Kamera aktiv"],[ce("imageCameraSwitch"),"Kamera Einzelbilder"],[ce("promptSound"),"Hinweistöne"]].filter(([r])=>r?.entity_id);
     const numbers=[[ce("targetNozzleControl"),"Düse Soll"],[ce("targetBedControl"),"Bett Soll"],[ce("targetChamberControl"),"Kammer Soll"]].filter(([r])=>r?.entity_id);
     const fans=[[ce("coolingFanControl"),"Bauteillüfter"],[ce("auxFanControl"),"Aux-Lüfter"],[ce("chamberFanControl"),"Kammerlüfter"],[ce("secondaryAuxFanControl"),"Aux-Lüfter 2"]].filter(([r])=>r?.entity_id);
@@ -1643,14 +1646,20 @@ class BambuLabDashboard extends HTMLElement {
     const cfg=resolveConfiguredPrinter(this._config,printer.id);
     const plugId=String(cfg.smart_plug_entity||"").trim();
     const plugState=plugId?this._hass.states[plugId]:null;
+    const idleShutdown=this._controlEntity(printer,"idleShutdown");
+    const idleId=String(idleShutdown?.entity_id||"").trim();
+    const idleState=idleId?this._hass.states[idleId]:null;
+    const idleOn=normalize(idleState?.state)==="on";
     const powerState=cfg.power_entity?this._hass.states[cfg.power_entity]:null;
     const energyState=cfg.energy_entity?this._hass.states[cfg.energy_entity]:null;
-    if(!plugId && !cfg.power_entity && !cfg.energy_entity) return `<section class="panel"><div class="panel-head"><div><div class="eyebrow">Energy</div><div class="panel-title">Strom & Steckdose</div></div></div><div class="empty"><ha-icon icon="mdi:power-plug-off"></ha-icon>Keine Smart-Steckdose bzw. Messsensoren zugeordnet. Im Karteneditor kannst du eine switch.*-Entity sowie Leistung und Energie wählen.</div></section>`;
+    if(!plugId && !idleId && !cfg.power_entity && !cfg.energy_entity) return `<section class="panel"><div class="panel-head"><div><div class="eyebrow">Energy</div><div class="panel-title">Strom & Steckdose</div></div></div><div class="empty"><ha-icon icon="mdi:power-plug-off"></ha-icon>Keine Smart-Steckdose bzw. Messsensoren zugeordnet. Im Karteneditor kannst du eine switch.*-Entity sowie Leistung und Energie wählen.</div></section>`;
     const power=powerState&&hasMeaningfulValue(powerState)?Number(powerState.state):null; const energy=energyState&&hasMeaningfulValue(energyState)?Number(energyState.state):null;
     const price=Number(this._config.kwh_price); const cost=Number.isFinite(energy)&&Number.isFinite(price)?this._convertEnergyToKwh(energyState,energy)*price:null;
     const samples=this._powerSamples.get(printer.id)||[]; const on=normalize(plugState?.state)==="on";
-    const plug=`${plugId?`<div class="smart-plug"><div><small>Smart-Steckdose</small><strong>${cssEscape(plugState?.attributes?.friendly_name||plugId)}</strong><span class="plug-state ${on?"on":""}">${on?"EIN":"AUS"}</span></div><button class="control-btn ${on?"danger":""}" data-smart-plug="${cssEscape(plugId)}">${on?"Ausschalten":"Einschalten"}</button></div>`:""}`;
-    return `<section class="panel"><div class="panel-head"><div><div class="eyebrow">Energy</div><div class="panel-title">Strom & Steckdose</div></div></div><div class="energy-body">${plug}<div class="energy-stats"><div class="energy-stat"><small>Leistung</small><strong>${Number.isFinite(power)?formatWatt(this._convertPowerToW(powerState,power)):"–"}</strong></div><div class="energy-stat"><small>Energie</small><strong>${Number.isFinite(energy)?formatKwh(this._convertEnergyToKwh(energyState,energy)):"–"}</strong></div><div class="energy-stat"><small>Kosten</small><strong>${cost===null?"–":`${formatNumber(cost,2)} €`}</strong></div></div>${samples.length>1?this._sparkline(samples):""}</div></section>`;
+    const plug=plugId?`<div class="smart-plug"><div><small>Smart-Steckdose</small><strong>${cssEscape(plugState?.attributes?.friendly_name||plugId)}</strong><span class="plug-state ${on?"on":""}">${on?"EIN":"AUS"}</span></div><button class="control-btn ${on?"danger":""}" data-smart-plug="${cssEscape(plugId)}">${on?"Aus":"Ein"}</button></div>`:"";
+    const idle=idleId?`<div class="smart-plug"><div><small>Leerlaufabschaltung</small><strong>${cssEscape(idleState?.attributes?.friendly_name||idleId)}</strong><span class="plug-state ${idleOn?"on":""}">${idleOn?"EIN":"AUS"}</span></div><button class="control-btn ${idleOn?"danger":""}" data-entity-action="${cssEscape(idleId)}">${idleOn?"Aus":"Ein"}</button></div>`:"";
+    const controls=plug||idle?`<div class="energy-controls">${plug}${idle}</div>`:"";
+    return `<section class="panel"><div class="panel-head"><div><div class="eyebrow">Energy</div><div class="panel-title">Strom & Steckdose</div></div></div><div class="energy-body">${controls}<div class="energy-stats"><div class="energy-stat"><small>Leistung</small><strong>${Number.isFinite(power)?formatWatt(this._convertPowerToW(powerState,power)):"–"}</strong></div><div class="energy-stat"><small>Energie</small><strong>${Number.isFinite(energy)?formatKwh(this._convertEnergyToKwh(energyState,energy)):"–"}</strong></div><div class="energy-stat"><small>Kosten</small><strong>${cost===null?"–":`${formatNumber(cost,2)} €`}</strong></div></div>${samples.length>1?this._sparkline(samples):""}</div></section>`;
   }
 
   _convertPowerToW(st, value) {

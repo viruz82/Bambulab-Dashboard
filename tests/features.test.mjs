@@ -34,7 +34,7 @@ assert.match(code,/secondaryChamberLight/);
 assert.match(code,/end_time_entity/);
 assert.match(code,/idle_shutdown_entity/);
 assert.match(code,/formatEndTime/);
-assert.match(code,/mdi:timer-off/);
+assert.match(code,/const idle=idleId\?/);
 assert.match(code,/camera_proxy_stream/);
 assert.match(code,/_officialMaintenanceTasks/);
 assert.match(code,/_activeFilament/);

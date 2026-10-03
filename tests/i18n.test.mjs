@@ -1,12 +1,12 @@
 import fs from "node:fs";
 import assert from "node:assert/strict";
 
-const code = fs.readFileSync(new URL("../Bambulab-Dashboard.js", import.meta.url), "utf8");
+const code = fs.readFileSync(new URL("../Bambulab-Dashboard.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const marker = "const I18N_EN = Object.freeze(";
 const start = code.indexOf(marker);
-const end = code.indexOf("\n});\nfunction uiLanguage", start);
+const end = code.indexOf("});\nfunction uiLanguage", start);
 assert.ok(start >= 0 && end > start, "I18N_EN block not found");
-const objectSource = code.slice(start + marker.length, end + 2);
+const objectSource = code.slice(start + marker.length, end + 1);
 const dict = Function(`"use strict"; return (${objectSource});`)();
 
 function en(text) {
