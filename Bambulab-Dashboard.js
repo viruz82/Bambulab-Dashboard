@@ -1051,6 +1051,9 @@ class BambuLabDashboard extends HTMLElement {
       this.addEventListener("touchend", () => this._markInteractionActive(520), { passive:true });
       this.addEventListener("touchcancel", () => this._markInteractionActive(520), { passive:true });
       this.addEventListener("wheel", () => this._markInteractionActive(260), { passive:true });
+      // A tap/click is an explicit action (tab switch, button): render its result right away instead of
+      // waiting for the touch guard to expire. The guard keeps protecting scrolling.
+      this.addEventListener("click", () => { this._interactionActiveUntil = 0; }, { capture:true });
       this._onViewportScroll = () => this._markInteractionActive(420);
       window.addEventListener("scroll", this._onViewportScroll, { passive:true, capture:true });
     }

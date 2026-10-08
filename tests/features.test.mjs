@@ -79,3 +79,7 @@ assert.match(code,/_maintenanceProfile\(printer\)/);
 assert.match(code,/model===\"X2D\"/);
 assert.match(code,/key:\"GENERIC\"/);
 assert.match(code,/kein erfundenes Kalenderintervall/);
+// Taps must not wait for the touch/scroll render guard (tab switch felt ~600 ms slow on mobile).
+assert.match(code,/addEventListener\("click", \(\) => \{ this\._interactionActiveUntil = 0; \}, \{ capture:true \}\)/);
+// Mobile nav must not scroll horizontally (a re-render resets scrollLeft).
+assert.match(code,/\.mobile-nav \{ display:grid; grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
