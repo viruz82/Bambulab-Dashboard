@@ -1,6 +1,6 @@
-/* Bambu Lab Dashboard v1.8.3 | standalone HACS resource */
+/* Bambu Lab Dashboard v1.8.4 | standalone HACS resource */
 
-const VERSION = "1.8.3";
+const VERSION = "1.8.4";
 const DOMAIN = "bambu_lab";
 
 
@@ -986,10 +986,12 @@ class BambuLabDashboard extends HTMLElement {
     this._maintRemoteLoaded = false;
     this._registryUnsubs = null;
     this._lastRenderAt = 0;
-    this._mobileTouchActive = false;
-    this._renderDirtyDuringTouch = false;
-    this._touchGuardBound = false;
-    this._touchReleaseTimer = null;
+    this._interactionActiveUntil = 0;
+    this._renderDirtyDuringInteraction = false;
+    this._interactionGuardBound = false;
+    this._interactionReleaseTimer = null;
+    this._renderPending = false;
+    this._onViewportScroll = null;
   }
 
   setConfig(config) {
@@ -1005,10 +1007,7 @@ class BambuLabDashboard extends HTMLElement {
     if (this._loaded) {
       this._samplePower();
       this._ensureBackgroundData();
-      if (previous !== hass && this._needsRender(previous, hass)) {
-        if (this._mobileTouchActive) this._renderDirtyDuringTouch = true;
-        else this._scheduleRender();
-      }
+      if (previous !== hass && this._needsRender(previous, hass)) this._scheduleRender();
     }
   }
 
@@ -1019,36 +1018,50 @@ class BambuLabDashboard extends HTMLElement {
     return { columns: 12, min_columns: 6, max_columns: 12 };
   }
 
+  _markInteractionActive(delay = 480) {
+    this._interactionActiveUntil = Math.max(this._interactionActiveUntil || 0, Date.now() + delay);
+    if (this._interactionReleaseTimer) clearTimeout(this._interactionReleaseTimer);
+    this._interactionReleaseTimer = setTimeout(() => {
+      if (Date.now() < this._interactionActiveUntil) {
+        this._markInteractionActive(Math.max(40, this._interactionActiveUntil - Date.now()));
+        return;
+      }
+      if (this._renderDirtyDuringInteraction) {
+        this._renderDirtyDuringInteraction = false;
+        this._scheduleRender();
+      }
+    }, delay + 20);
+  }
+
+  _interactionActive() {
+    return Date.now() < (this._interactionActiveUntil || 0);
+  }
+
   connectedCallback() {
     // Fallback polling only; registry events (see _subscribeRegistry) trigger rediscovery immediately.
     if (!this._rediscoverTimer) this._rediscoverTimer = setInterval(() => this._discover(false), 600000);
     if (this._loaded) this._subscribeRegistry();
-    if (!this._touchGuardBound) {
-      this._touchGuardBound = true;
-      this.addEventListener("touchstart", () => {
-        this._mobileTouchActive = true;
-        if (this._touchReleaseTimer) clearTimeout(this._touchReleaseTimer);
-      }, { passive:true });
-      const release = () => {
-        if (this._touchReleaseTimer) clearTimeout(this._touchReleaseTimer);
-        this._touchReleaseTimer = setTimeout(() => {
-          this._mobileTouchActive = false;
-          if (this._renderDirtyDuringTouch) {
-            this._renderDirtyDuringTouch = false;
-            this._scheduleRender();
-          }
-        }, 220);
-      };
-      this.addEventListener("touchend", release, { passive:true });
-      this.addEventListener("touchcancel", release, { passive:true });
+    if (!this._interactionGuardBound) {
+      this._interactionGuardBound = true;
+      const markTouch = () => this._markInteractionActive(520);
+      this.addEventListener("touchstart", markTouch, { passive:true });
+      this.addEventListener("touchmove", markTouch, { passive:true });
+      this.addEventListener("touchend", () => this._markInteractionActive(520), { passive:true });
+      this.addEventListener("touchcancel", () => this._markInteractionActive(520), { passive:true });
+      this.addEventListener("wheel", () => this._markInteractionActive(260), { passive:true });
+      this._onViewportScroll = () => this._markInteractionActive(420);
+      window.addEventListener("scroll", this._onViewportScroll, { passive:true, capture:true });
     }
   }
 
   disconnectedCallback() {
     if (this._rediscoverTimer) clearInterval(this._rediscoverTimer);
     this._rediscoverTimer = null;
-    if (this._touchReleaseTimer) clearTimeout(this._touchReleaseTimer);
-    this._touchReleaseTimer = null;
+    if (this._interactionReleaseTimer) clearTimeout(this._interactionReleaseTimer);
+    this._interactionReleaseTimer = null;
+    if (this._onViewportScroll) window.removeEventListener("scroll", this._onViewportScroll, true);
+    this._onViewportScroll = null;
+    this._interactionGuardBound = false;
     this._unsubscribeRegistry();
   }
 
@@ -1166,7 +1179,8 @@ class BambuLabDashboard extends HTMLElement {
       this._loadError = err?.message || String(err);
     } finally {
       this._loading = false;
-      this._render();
+      // Registry refresh must obey the same interaction guard as live HA state updates.
+      this._scheduleRender();
     }
   }
 
@@ -1354,33 +1368,6 @@ class BambuLabDashboard extends HTMLElement {
     return printerArtworkUrl(printer?.device);
   }
 
-  _captureScrollState() {
-    const list = [];
-    const seen = new Set();
-    const add = (el) => { if (el && !seen.has(el)) { seen.add(el); list.push([el, el.scrollTop, el.scrollLeft]); } };
-    add(document.scrollingElement);
-    try { if (document.documentElement) add(document.documentElement); if (document.body) add(document.body); } catch (_) {}
-    let node = this;
-    for (let i=0; node && i<16; i++) {
-      const root = node.getRootNode?.();
-      const parent = node.parentElement || (root && root.host) || null;
-      if (!parent || parent === node) break;
-      try {
-        const cs = getComputedStyle(parent);
-        if ((/(auto|scroll|overlay)/).test(cs.overflowY) && parent.scrollHeight > parent.clientHeight) add(parent);
-      } catch (_) {}
-      node = parent;
-    }
-    return list;
-  }
-
-  _restoreScrollState(state) {
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      for (const [el, top, left] of state || []) { try { el.scrollTop = top; el.scrollLeft = left; } catch (_) {} }
-      try { const doc = (state||[]).find(([el])=>el===document.scrollingElement); if(doc) window.scrollTo(doc[2], doc[1]); } catch (_) {}
-    }));
-  }
-
   // HA hands over a new hass object whenever any entity in the system changes.
   // Only re-render when a state this card actually read during its last render changed.
   _needsRender(previous, hass) {
@@ -1392,14 +1379,30 @@ class BambuLabDashboard extends HTMLElement {
   }
 
   _scheduleRender() {
+    if (this._interactionActive()) {
+      this._renderDirtyDuringInteraction = true;
+      return;
+    }
     if (this._renderPending) return;
     this._renderPending = true;
-    requestAnimationFrame(() => { this._renderPending = false; this._render(); });
+    requestAnimationFrame(() => {
+      this._renderPending = false;
+      if (this._interactionActive()) {
+        this._renderDirtyDuringInteraction = true;
+        return;
+      }
+      this._render();
+    });
   }
 
   _render() {
     if (!this.shadowRoot) return;
-    const scrollState = this._captureScrollState();
+    // Never replace the complete Shadow DOM while the user is touching or scrolling.
+    // Rebuilding it during momentum scrolling causes Safari/WebView layout jumps.
+    if (this._interactionActive()) {
+      this._renderDirtyDuringInteraction = true;
+      return;
+    }
     const oldCamera = this.shadowRoot.querySelector("img[data-camera-key]");
     const realHass = this._hass;
     const accessed = new Map();
@@ -1420,7 +1423,6 @@ class BambuLabDashboard extends HTMLElement {
     const newCamera = this.shadowRoot.querySelector("img[data-camera-key]");
     if (oldCamera && newCamera && oldCamera.dataset.cameraKey === newCamera.dataset.cameraKey) newCamera.replaceWith(oldCamera);
     this._bindEvents();
-    this._restoreScrollState(scrollState);
   }
 
   _navItems() {

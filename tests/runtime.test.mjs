@@ -15,7 +15,10 @@ const printer={id:"p",device:{model:"P1S",name:"P1S"},entries:[
  {entity_id:"sensor.p_end",unique_id:"S_end_time",translation_key:"end_time",platform:"bambu_lab"},
 ],childDevices:[]};
 card._config={printers:[{device_id:'p',secondary_light_entity:'light.p_extra',idle_shutdown_entity:'input_boolean.idle_shutdown',smart_plug_entity:'switch.smart_plug'}]}; card._printers=[printer]; card._selectedPrinterId='p'; card._devices=[]; card._entities=[];
-card._hass={language:'de',themes:{darkMode:true},entities:{
+card._hass={
+ language:"de",
+ themes:{darkMode:true},
+ entities:{
  'select.p_speed':{entity_id:'select.p_speed',device_id:'p',translation_key:'printing_speed',platform:'bambu_lab'},
  'button.p_pause':{entity_id:'button.p_pause',device_id:'p',translation_key:'pause',platform:'bambu_lab'},
  'light.p_extra':{entity_id:'light.p_extra',device_id:'p',translation_key:'extra_light',platform:'bambu_lab'},
@@ -46,7 +49,7 @@ assert.equal(card._themeClass(),'theme-dark');
 card._config.theme='light'; assert.equal(card._themeClass(),'theme-light');
 assert.match(card._renderPrinterOverviewCard(printer),/42<span>%<\/span>/);
 assert.match(card._renderPrinterOverviewCard(printer),/Endzeit/);
-assert.match(card._renderPrinterOverviewCard(printer),/09\.09\.\d{2}/);
+assert.match(card._renderPrinterOverviewCard(printer),/09\.09\.\d{2}, \d{2}:30/);
 const controls=card._renderControls(printer); assert.match(controls,/Pause/); assert.match(controls,/Düse Soll/); assert.match(controls,/Bauteillüfter/); assert.match(controls,/Druckgeschwindigkeit/); assert.match(controls,/Schreibzugriffe sind für diesen Drucker eingeschränkt/);
 assert.match(controls,/>Licht 2<.*>EIN<\/strong>/); assert.match(controls,/light\.p_extra/); assert.match(controls,/mdi:lightbulb/); assert.match(controls,/control-state/);
 card._hass.states['light.p_extra'].state='off';

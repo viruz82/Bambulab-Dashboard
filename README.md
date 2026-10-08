@@ -51,7 +51,15 @@ printers:
     end_time_entity: sensor.drucker_endzeit           # optional, nur falls die automatische Erkennung nicht passt
 ```
 
-## Funktionen in v1.8.3
+## Änderungen / Fehlerbehebungen in v1.8.4
+
+- **Mobile Scroll-Zuckeln behoben:** Während Touch-, Scroll- und Momentum-Scroll-Vorgängen wird kein vollständiger Neuaufbau des Dashboard-Shadow-DOM mehr ausgeführt.
+- **Ungewolltes Hochspringen der Seite behoben:** Die frühere nachträgliche Wiederherstellung der Scrollposition per `scrollTo` wurde entfernt; Aktualisierungen werden stattdessen während der Bedienung zurückgestellt und anschließend gebündelt ausgeführt.
+- **60-Sekunden-Aktualisierung abgesichert:** Die automatische Geräte-Neuerkennung darf während einer laufenden Touch-/Scroll-Interaktion keinen ungeschützten Full-Render mehr auslösen.
+- **Home-Assistant-Admin/Karteneditor stabilisiert:** Live-State-Aktualisierungen bauen den Editor nicht neu auf; bei notwendigen Konfigurations-Neuaufbauten bleiben geöffnete Bereiche und die interne Scrollposition erhalten.
+- **Regressionstests erweitert:** Tests sichern den neuen Mobile-/Admin-Render-Schutz ab und verhindern die Wiedereinführung der alten Scroll-Restore-Logik.
+
+## Funktionen in v1.8.4
 
 - Mehrere Bambu-Drucker automatisch erkennen.
 - Übersicht mit Status, Fortschritt, Restzeit, Temperaturen, AMS-Anzahl und Gesamtlaufzeit.
@@ -129,7 +137,7 @@ Nach dem Quittieren einer Wartung erscheint eine sichtbare Bestätigung. Die War
 
 ## Sprache / Language
 
-Die Dashboard-Oberfläche übernimmt automatisch die Sprache von Home Assistant. Deutsch wird als Deutsch dargestellt; Englisch sowie derzeit nicht separat übersetzte Home-Assistant-Sprachen verwenden Englisch als Fallback. Übersetzt werden Navigation, Übersicht, Druckerdetails, Steuerung, Kamera/AMS, Energie, Wartungsprofile und -hinweise, Wartungsbuch, Popups, Sicherheitsabfragen sowie der Karteneditor. Datumsangaben wechseln ebenfalls zwischen deutschem und englischem Format. Die Entity-Namen und bestimmte Zustände der Bambu-Integration selbst bleiben davon getrennt und richten sich nach Home Assistant bzw. der Integration. Ab v1.8.3 wird diese Abdeckung zusätzlich durch einen eigenen i18n-Test geprüft.
+Die Dashboard-Oberfläche übernimmt automatisch die Sprache von Home Assistant. Deutsch wird als Deutsch dargestellt; Englisch sowie derzeit nicht separat übersetzte Home-Assistant-Sprachen verwenden Englisch als Fallback. Übersetzt werden Navigation, Übersicht, Druckerdetails, Steuerung, Kamera/AMS, Energie, Wartungsprofile und -hinweise, Wartungsbuch, Popups, Sicherheitsabfragen sowie der Karteneditor. Datumsangaben wechseln ebenfalls zwischen deutschem und englischem Format. Die Entity-Namen und bestimmte Zustände der Bambu-Integration selbst bleiben davon getrennt und richten sich nach Home Assistant bzw. der Integration. Ab v1.8.4 wird diese Abdeckung zusätzlich durch einen eigenen i18n-Test geprüft.
 
 ## Smart-Steckdose / Energie
 

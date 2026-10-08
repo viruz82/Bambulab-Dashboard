@@ -2,19 +2,31 @@
 
 ## Unveröffentlicht
 
-- Endzeit des aktiven Druckauftrags in der Übersicht (`end_time_entity` als optionaler Override).
-- Optionales Zusatzlicht (`secondary_light_entity`) als „Licht 2“ in den Quick Controls; Licht-Buttons zeigen ihren EIN/AUS-Status.
-- Optionale Idle-Abschaltung (`idle_shutdown_entity`, `input_boolean`/`switch`) im Energie-Reiter neben der Smart-Steckdose.
+- Idle-Abschaltung aus den Quick Controls in den Energie-Reiter verschoben (neben der Smart-Steckdose, mit EIN/AUS-Status); „Aus“-Button nicht rot markiert.
 - Performance: Neu gerendert wird nur noch, wenn sich ein tatsächlich angezeigter State ändert (statt bei jeder Zustandsänderung in Home Assistant).
 - Kamera-Stream bleibt über Neuaufbauten bestehen und verbindet sich nicht mehr bei jedem Update bzw. Token-Wechsel neu.
 - Energie-Reiter: Kosten und kWh des aktuellen bzw. letzten Drucks aus der Home-Assistant-History; Leistungskurve beim Öffnen aus der History vorbefüllt.
 - Wartungsbuch wird geräteübergreifend in Home Assistant gespeichert (`frontend/set_user_data`); bestehende lokale Wartungsbücher werden beim ersten Öffnen zusammengeführt.
 - Geräteerkennung reagiert auf Registry-Events statt alle 60 Sekunden die komplette Registry abzufragen.
-- Idle-Abschaltung: „Aus“-Button nicht mehr rot markiert.
-- Doku: vollständiges YAML-Beispiel und Hinweis zu `grid_options: columns: full` für die breite Desktop-Ansicht.
+- Doku: vollständiges YAML-Beispiel inkl. Zusatzlicht/Idle-Abschaltung/Endzeit und Hinweis zu `grid_options: columns: full` für die breite Desktop-Ansicht.
+
+## 1.8.4
+
+- Mobile Scroll-Stabilisierung überarbeitet: vollständige Shadow-DOM-Neuaufbauten werden während Touch-, Scroll- und Momentum-Scroll-Interaktionen blockiert und anschließend gebündelt nachgeholt.
+- Die 60-Sekunden-Geräteerkennung verwendet jetzt denselben Render-Guard wie Live-State-Updates und kann beim Scrollen keinen ungeschützten Full-Render mehr auslösen.
+- Alte Scrollpositions-Wiederherstellung per nachträglichem `scrollTo` entfernt, um sichtbare Sprünge auf mobilen Browsern/WebViews zu vermeiden.
+- Home-Assistant-Karteneditor/Adminbereich bleibt von Live-State-Neuaufbauten getrennt und bewahrt geöffnete Bereiche sowie seine interne Scrollposition.
+- Regressionstests für den neuen Mobile-/Admin-Render-Schutz ergänzt.
 
 ## 1.8.3
 
+- Optionales zweites Licht pro Drucker ergänzt; frei zuordenbar und in den Quick Controls steuerbar.
+- Druck-Endzeit in der Druckerübersicht ergänzt; automatische Erkennung über `end_time` bzw. manuelle Zuordnung möglich.
+- Optionale Idle-/Leerlaufabschaltung über einen frei zuordenbaren `input_boolean` ergänzt.
+- Licht und zweites Licht zeigen ihren aktuellen EIN/AUS-Status direkt in den Quick Controls und werden bei aktivem Zustand hervorgehoben.
+- Runtime-Tests für Endzeit, zweites Licht, Idle-Shutdown und Lichtstatus erweitert.
+- Endzeit-Test robust auf die deutsche Home-Assistant-Locale abgestimmt.
+- Automatischer GitHub-Release-Workflow ergänzt: Änderungen aus diesem Changelog werden als Release Notes veröffentlicht, damit HACS Versionsupdates und Änderungsinformationen sauber anzeigen kann.
 - Deutsch/Englisch vollständig gegen die tatsächlich sichtbaren Dashboard-, Editor-, Popup-, Wartungs- und Bestätigungstexte gegengeprüft und fehlende englische Übersetzungen ergänzt.
 - Neue modellabhängige Wartungstexte für A1, A1 mini, A2L, P1/P2, X1, H2/H2S, X2D und den sicheren Generic-Fallback vollständig in die englische Oberfläche aufgenommen.
 - Smart-Steckdosen-Sicherheitsabfrage folgt jetzt ebenfalls der Home-Assistant-Sprache.
@@ -42,7 +54,7 @@
 - Dashboard-Oberfläche automatisch zweisprachig: Deutsch bei deutscher Home-Assistant-Sprache, Englisch bei englischer bzw. sonstiger Sprache als Fallback; Datumsformat passt sich an.
 - Wartung vollständig modellabhängig: Profil wird automatisch aus dem von `ha-bambulab` gemeldeten Druckermodell gewählt.
 - Abdeckung der aktuell von `ha-bambulab` gelisteten Modelle A1, A1 mini, A2L, P1P, P1S, P2S, H2C, H2D, H2D Pro, H2S, X1, X1C, X1E und X2D.
-- Keine Übernahme von X2D-Intervallen auf andere Modelle; Kalendertermine nur bei verifiziertem modellbezogenem Herstellerintervall.
+- Keine Übernahme von X2D-Intervallen auf andere Modelle; Kalendertermine nur bei verifiziertem modellbezogenen Herstellerintervall.
 - Unbekannte zukünftige Modelle erhalten einen sicheren allgemeinen Fallback ohne erfundene Fristen.
 - Wartungsseite zeigt das automatisch gewählte Modell-/Familienprofil an.
 - Wartungsbuttons mit Hover-/Active-/Focus-Feedback und sichtbarer Bestätigung nach Quittierung.

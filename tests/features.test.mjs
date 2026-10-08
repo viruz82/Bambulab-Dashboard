@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import assert from "node:assert/strict";
 const code=fs.readFileSync(new URL("../Bambulab-Dashboard.js", import.meta.url),"utf8");
-assert.match(code,/const VERSION = "1\.8\.3"/);
+assert.match(code,/const VERSION = "1\.8\.4"/);
 assert.match(code,/_isInCardPicker/);
 assert.match(code,/preview: true/);
 assert.match(code,/data-open-printer=/);
@@ -15,7 +15,7 @@ assert.match(code,/printing_speed/);
 assert.match(code,/data-theme/);
 assert.match(code,/theme-light/);
 assert.match(code,/object-fit:contain/);
-assert.match(code,/_captureScrollState/);
+assert.doesNotMatch(code,/_captureScrollState/);
 assert.match(code,/_renderCurrentPrint/);
 assert.match(code,/total_usage_hours/);
 assert.doesNotMatch(code,/image_url/);
@@ -46,7 +46,13 @@ assert.match(code,/Developer LAN Mode/);
 assert.match(code,/data-maint-source/);
 assert.match(code,/_renderMaintenanceModal/);
 
-assert.match(code,/_mobileTouchActive/);
+assert.doesNotMatch(code,/_mobileTouchActive/);
+assert.match(code,/_interactionActiveUntil/);
+assert.match(code,/_markInteractionActive/);
+assert.match(code,/window\.addEventListener\("scroll"/);
+assert.match(code,/_renderDirtyDuringInteraction/);
+assert.match(code,/Registry refresh must obey the same interaction guard/);
+assert.doesNotMatch(code,/_restoreScrollState/);
 assert.match(code,/spool-modal-backdrop/);
 assert.match(code,/data-close-spool-backdrop/);
 assert.match(code,/touch-action:pan-x/);
@@ -65,7 +71,7 @@ assert.match(code,/data-maint-log-delete/);
 assert.match(code,/data-maint-log-clear/);
 assert.match(code,/maintenance-summary/);
 
-// v1.8.3: maintenance must be selected by the detected model, never globally from X2D.
+// Maintenance must be selected by the detected model, never globally from X2D.
 for (const model of ["A1","A1MINI","A2L","P1P","P1S","P2S","H2C","H2D","H2DPRO","H2S","X1","X1C","X1E","X2D"]) {
   assert.ok(code.includes(`\"${model}\"`), `maintenance/model support missing: ${model}`);
 }
