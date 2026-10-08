@@ -247,6 +247,20 @@ function formatEndTime(value, hass) {
   return date.toLocaleString(uiLocale(hass), { dateStyle: "short", timeStyle: "short" });
 }
 
+const MAINT_USER_DATA_KEY = "bambu-lab-dashboard-maintenance";
+const MAINT_SYNCED_KEY = "bambu-dashboard-maint-synced";
+
+function mergeMaintenanceData(a, b) {
+  const norm = (d) => ({ history: Array.isArray(d?.history) ? d.history : [], last: d?.last && typeof d.last === "object" ? d.last : {}, initializedAt: d?.initializedAt });
+  const x = norm(a), y = norm(b);
+  const history = new Map();
+  for (const e of [...x.history, ...y.history]) history.set(e?.id || `${e?.ts}-${e?.taskId}`, e);
+  const last = { ...x.last };
+  for (const [k, v] of Object.entries(y.last)) last[k] = Math.max(Number(last[k]) || 0, Number(v) || 0);
+  const inits = [x.initializedAt, y.initializedAt].filter(Number.isFinite);
+  return { history: [...history.values()].sort((m, n) => (m.ts || 0) - (n.ts || 0)), last, ...(inits.length ? { initializedAt: Math.min(...inits) } : {}) };
+}
+
 function translateStatus(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return "Unbekannt";
@@ -431,7 +445,7 @@ const I18N_EN = Object.freeze({
   "Kamera":"Camera","Keine Kamera-Entität verfügbar oder Kamera nicht aktiviert.":"No camera entity available or camera is not enabled.","Kamera aktiv":"Camera enabled","Einzelbild-Modus":"Still image mode","EIN":"ON","AUS":"OFF",
   "Kein AMS für diesen Drucker erkannt.":"No AMS detected for this printer.","Einheit":"unit","Einheiten":"units","AMS Slot Details":"AMS Slot Details","Schließen":"Close","Home-Assistant-Details öffnen":"Open Home Assistant details",
   "Aktives Filament nicht gemeldet":"Active filament not reported","Schreibzugriffe sind für diesen Drucker eingeschränkt.":"Write access is restricted for this printer.",
-  "Druck & Gerät":"Print & Device","Smart-Steckdose":"Smart Plug","Ausschalten":"Turn off","Einschalten":"Turn on","Strom & Steckdose":"Power & Smart Plug","Leistung":"Power","Kosten":"Cost",
+  "Druck & Gerät":"Print & Device","Smart-Steckdose":"Smart Plug","Ausschalten":"Turn off","Einschalten":"Turn on","Strom & Steckdose":"Power & Smart Plug","Leistung":"Power","Kosten gesamt":"Total cost","Letzter Druck":"Last Print","Kosten":"Cost",
   "Bambu-Lab-Intervalllogik:":"Bambu Lab interval logic:","Gesamtlaufzeit laut Bambu-Integration":"Total runtime reported by Bambu integration",
   "Nächste Wartungen":"Upcoming Maintenance","FÄLLIG":"DUE","Als erledigt quittieren":"Mark as completed","Wartungsbuch":"Maintenance Log",
   "Aktuell ist keine Wartung fällig. Noch nicht fällige Arbeiten erscheinen automatisch wieder zum nächsten Herstellerintervall.":"No maintenance is currently due. Tasks that are not yet due will automatically reappear at the next manufacturer interval.",
@@ -728,6 +742,8 @@ const styles = `
   .energy-controls .smart-plug > div { min-width:0; overflow-wrap:anywhere; }
   .energy-controls .control-btn { flex:0 0 auto; white-space:nowrap; }
   .energy-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; }
+  .energy-stats.four { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .energy-stat em { display:block; margin-top:3px; color:var(--bd-muted); font-size:10px; font-style:normal; }
   .energy-stat { padding:11px; border-radius:13px; border:1px solid rgba(255,255,255,.045); background:rgba(255,255,255,.02); }
   .energy-stat small { color:var(--bd-muted); display:block; font-size:9px; letter-spacing:.07em; text-transform:uppercase; }
   .energy-stat strong { display:block; margin-top:5px; font-size:14px; }
@@ -781,6 +797,7 @@ const styles = `
     .energy-stats { grid-template-columns:1fr 1fr; }
     .energy-controls { grid-template-columns:1fr; }
     .energy-stat:last-child { grid-column:span 2; }
+    .energy-stats.four .energy-stat:last-child { grid-column:auto; }
     .metric-grid { grid-template-columns:1fr 1fr; }
     .editor-row { grid-template-columns:1fr; }
   }
@@ -963,6 +980,11 @@ class BambuLabDashboard extends HTMLElement {
     this._lastPowerSampleAt = new Map();
     this._selectedSpoolEntityId = null;
     this._renderedStates = null;
+    this._powerHistoryLoaded = new Set();
+    this._printCost = new Map();
+    this._maintCache = null;
+    this._maintRemoteLoaded = false;
+    this._registryUnsubs = null;
     this._lastRenderAt = 0;
     this._mobileTouchActive = false;
     this._renderDirtyDuringTouch = false;
@@ -982,6 +1004,7 @@ class BambuLabDashboard extends HTMLElement {
     if (!this._loaded && !this._loading) this._discover();
     if (this._loaded) {
       this._samplePower();
+      this._ensureBackgroundData();
       if (previous !== hass && this._needsRender(previous, hass)) {
         if (this._mobileTouchActive) this._renderDirtyDuringTouch = true;
         else this._scheduleRender();
@@ -997,7 +1020,9 @@ class BambuLabDashboard extends HTMLElement {
   }
 
   connectedCallback() {
-    if (!this._rediscoverTimer) this._rediscoverTimer = setInterval(() => this._discover(false), 60000);
+    // Fallback polling only; registry events (see _subscribeRegistry) trigger rediscovery immediately.
+    if (!this._rediscoverTimer) this._rediscoverTimer = setInterval(() => this._discover(false), 600000);
+    if (this._loaded) this._subscribeRegistry();
     if (!this._touchGuardBound) {
       this._touchGuardBound = true;
       this.addEventListener("touchstart", () => {
@@ -1024,6 +1049,100 @@ class BambuLabDashboard extends HTMLElement {
     this._rediscoverTimer = null;
     if (this._touchReleaseTimer) clearTimeout(this._touchReleaseTimer);
     this._touchReleaseTimer = null;
+    this._unsubscribeRegistry();
+  }
+
+  async _subscribeRegistry() {
+    const conn = this._hass?.connection;
+    if (this._registryUnsubs || !conn?.subscribeEvents) return;
+    this._registryUnsubs = [];
+    const onChange = () => {
+      clearTimeout(this._registryDebounce);
+      this._registryDebounce = setTimeout(() => this._discover(false), 2000);
+    };
+    for (const type of ["device_registry_updated", "entity_registry_updated"]) {
+      try { this._registryUnsubs.push(await conn.subscribeEvents(onChange, type)); } catch (_) {}
+    }
+    if (!this.isConnected) this._unsubscribeRegistry();
+  }
+
+  _unsubscribeRegistry() {
+    clearTimeout(this._registryDebounce);
+    for (const unsub of this._registryUnsubs || []) { try { unsub(); } catch (_) {} }
+    this._registryUnsubs = null;
+  }
+
+  // Async data that is not part of hass.states: power history, cost of the last print, synced maintenance log.
+  _ensureBackgroundData() {
+    if (!this._hass?.callWS) return;
+    this._subscribeRegistry();
+    if (!this._maintRemoteLoaded && !this._maintLoading && !this._maintFailed) this._loadRemoteMaintenance();
+    const printer = this._selectedPrinter();
+    if (!printer) return;
+    const cfg = resolveConfiguredPrinter(this._config, printer.id);
+    if (cfg.power_entity && !this._powerHistoryLoaded.has(printer.id)) this._loadPowerHistory(printer, cfg.power_entity);
+    if (cfg.energy_entity) this._ensurePrintCost(printer, cfg.energy_entity);
+  }
+
+  async _history(entityIds, start, end = null) {
+    const res = await this._hass.callWS({ type: "history/history_during_period", start_time: new Date(start).toISOString(), ...(end ? { end_time: new Date(end).toISOString() } : {}), entity_ids: entityIds, minimal_response: true, no_attributes: true, significant_changes_only: false });
+    const out = {};
+    for (const id of entityIds) {
+      out[id] = (res?.[id] || []).map((r) => ({ s: r.s ?? r.state, t: r.lu !== undefined ? Number(r.lu) * 1000 : Date.parse(r.last_changed || r.last_updated) })).filter((r) => Number.isFinite(r.t));
+    }
+    return out;
+  }
+
+  async _loadPowerHistory(printer, entityId) {
+    this._powerHistoryLoaded.add(printer.id);
+    try {
+      const now = Date.now(), step = 15000, count = 60, start = now - step * count;
+      const rows = (await this._history([entityId], start))[entityId] || [];
+      const samples = [];
+      let idx = 0, value = null;
+      for (let t = start; t <= now; t += step) {
+        while (idx < rows.length && rows[idx].t <= t) { const v = Number(rows[idx].s); value = Number.isFinite(v) ? v : null; idx++; }
+        if (value !== null) samples.push({ t, v: value });
+      }
+      const live = (this._powerSamples.get(printer.id) || []).filter((x) => x.t > now);
+      const merged = [...samples, ...live].slice(-count);
+      if (merged.length) { this._powerSamples.set(printer.id, merged); this._lastPowerSampleAt.set(printer.id, now); this._scheduleRender(); }
+    } catch (err) {
+      console.warn("[Bambu Lab Dashboard] Power history unavailable", err);
+    }
+  }
+
+  // Energy used by the current or last print: energy meter at print start vs. now (running) or at print end.
+  async _ensurePrintCost(printer, energyId) {
+    const statusId = this._entry(printer, "status")?.entity_id;
+    if (!statusId) return;
+    const status = normalize(this._hass.states[statusId]?.state);
+    const known = this._printCost.get(printer.id);
+    if (known && (known.loading || known.status === status)) return;
+    this._printCost.set(printer.id, { ...(known || {}), loading: true, status });
+    try {
+      const active = (v) => ["running","printing","prepare","preparing","pause","paused"].includes(normalize(v));
+      const now = Date.now();
+      const rows = (await this._history([statusId], now - 30 * 86400000))[statusId] || [];
+      let startIdx = -1;
+      for (let i = rows.length - 1; i >= 0; i--) {
+        if (active(rows[i].s)) { startIdx = i; while (startIdx > 0 && active(rows[startIdx - 1].s)) startIdx--; break; }
+      }
+      if (startIdx < 0) { this._printCost.set(printer.id, { status, none: true }); this._scheduleRender(); return; }
+      const startT = rows[startIdx].t;
+      let endIdx = startIdx;
+      while (endIdx < rows.length && active(rows[endIdx].s)) endIdx++;
+      const running = endIdx >= rows.length;
+      const endT = running ? null : rows[endIdx].t;
+      const energy = (await this._history([energyId], startT, endT || now))[energyId] || [];
+      const nums = energy.map((r) => Number(r.s)).filter(Number.isFinite);
+      if (!nums.length) { this._printCost.set(printer.id, { status, none: true }); this._scheduleRender(); return; }
+      this._printCost.set(printer.id, { status, running, startT, endT, startEnergy: nums[0], endEnergy: running ? null : nums[nums.length - 1] });
+      this._scheduleRender();
+    } catch (err) {
+      console.warn("[Bambu Lab Dashboard] Print cost unavailable", err);
+      this._printCost.set(printer.id, { status, none: true });
+    }
   }
 
   async _discover(showLoading = true) {
@@ -1683,10 +1802,18 @@ class BambuLabDashboard extends HTMLElement {
     const power=powerState&&hasMeaningfulValue(powerState)?Number(powerState.state):null; const energy=energyState&&hasMeaningfulValue(energyState)?Number(energyState.state):null;
     const price=Number(this._config.kwh_price); const cost=Number.isFinite(energy)&&Number.isFinite(price)?this._convertEnergyToKwh(energyState,energy)*price:null;
     const samples=this._powerSamples.get(printer.id)||[]; const on=normalize(plugState?.state)==="on";
+    const pc=this._printCost.get(printer.id);
+    let printKwh=null;
+    if(pc&&Number.isFinite(pc.startEnergy)){
+      const endRaw=pc.running?energy:pc.endEnergy;
+      if(Number.isFinite(endRaw)) printKwh=Math.max(0,this._convertEnergyToKwh(energyState,endRaw)-this._convertEnergyToKwh(energyState,pc.startEnergy));
+    }
+    const printCost=printKwh!==null&&Number.isFinite(price)?printKwh*price:null;
+    const printStat=cfg.energy_entity?`<div class="energy-stat"><small>${pc?.running?"Aktueller Druck":"Letzter Druck"}</small><strong>${printCost===null?"–":`${formatNumber(printCost,2)} €`}</strong>${printKwh===null?"":`<em>${formatKwh(printKwh)}${!pc.running&&pc.endT?` · ${new Date(pc.endT).toLocaleDateString(uiLocale(this._hass),{day:"2-digit",month:"2-digit"})}`:""}</em>`}</div>`:"";
     const plug=plugId?`<div class="smart-plug"><div><small>Smart-Steckdose</small><strong>${cssEscape(plugState?.attributes?.friendly_name||plugId)}</strong><span class="plug-state ${on?"on":""}">${on?"EIN":"AUS"}</span></div><button class="control-btn ${on?"danger":""}" data-smart-plug="${cssEscape(plugId)}">${on?"Aus":"Ein"}</button></div>`:"";
-    const idle=idleId?`<div class="smart-plug"><div><small>Leerlaufabschaltung</small><strong>${cssEscape(idleState?.attributes?.friendly_name||idleId)}</strong><span class="plug-state ${idleOn?"on":""}">${idleOn?"EIN":"AUS"}</span></div><button class="control-btn ${idleOn?"danger":""}" data-entity-action="${cssEscape(idleId)}">${idleOn?"Aus":"Ein"}</button></div>`:"";
+    const idle=idleId?`<div class="smart-plug"><div><small>Leerlaufabschaltung</small><strong>${cssEscape(idleState?.attributes?.friendly_name||idleId)}</strong><span class="plug-state ${idleOn?"on":""}">${idleOn?"EIN":"AUS"}</span></div><button class="control-btn" data-entity-action="${cssEscape(idleId)}">${idleOn?"Aus":"Ein"}</button></div>`:"";
     const controls=plug||idle?`<div class="energy-controls">${plug}${idle}</div>`:"";
-    return `<section class="panel"><div class="panel-head"><div><div class="eyebrow">Energy</div><div class="panel-title">Strom & Steckdose</div></div></div><div class="energy-body">${controls}<div class="energy-stats"><div class="energy-stat"><small>Leistung</small><strong>${Number.isFinite(power)?formatWatt(this._convertPowerToW(powerState,power)):"–"}</strong></div><div class="energy-stat"><small>Energie</small><strong>${Number.isFinite(energy)?formatKwh(this._convertEnergyToKwh(energyState,energy)):"–"}</strong></div><div class="energy-stat"><small>Kosten</small><strong>${cost===null?"–":`${formatNumber(cost,2)} €`}</strong></div></div>${samples.length>1?this._sparkline(samples):""}</div></section>`;
+    return `<section class="panel"><div class="panel-head"><div><div class="eyebrow">Energy</div><div class="panel-title">Strom & Steckdose</div></div></div><div class="energy-body">${controls}<div class="energy-stats ${printStat?"four":""}"><div class="energy-stat"><small>Leistung</small><strong>${Number.isFinite(power)?formatWatt(this._convertPowerToW(powerState,power)):"–"}</strong></div><div class="energy-stat"><small>Energie</small><strong>${Number.isFinite(energy)?formatKwh(this._convertEnergyToKwh(energyState,energy)):"–"}</strong></div><div class="energy-stat"><small>${printStat?"Kosten gesamt":"Kosten"}</small><strong>${cost===null?"–":`${formatNumber(cost,2)} €`}</strong></div>${printStat}</div>${samples.length>1?this._sparkline(samples):""}</div></section>`;
   }
 
   _convertPowerToW(st, value) {
@@ -1713,8 +1840,8 @@ class BambuLabDashboard extends HTMLElement {
 
   _maintenanceKey(printerId){ return `bambu-dashboard-maint-v1:${printerId}`; }
   _maintenanceState(printerId){
-    let data;
-    try{ data=JSON.parse(localStorage.getItem(this._maintenanceKey(printerId))||'{"history":[],"last":{}}'); }catch{ data={history:[],last:{}}; }
+    let data=this._maintCache?.[printerId] ? JSON.parse(JSON.stringify(this._maintCache[printerId])) : null;
+    if(!data){ try{ data=JSON.parse(localStorage.getItem(this._maintenanceKey(printerId))||'{"history":[],"last":{}}'); }catch{ data={history:[],last:{}}; } }
     data=data&&typeof data==="object"?data:{};
     data.history=Array.isArray(data.history)?data.history:[];
     data.last=data.last&&typeof data.last==="object"?data.last:{};
@@ -1724,7 +1851,37 @@ class BambuLabDashboard extends HTMLElement {
     }
     return data;
   }
-  _saveMaintenanceState(printerId,data){ try{localStorage.setItem(this._maintenanceKey(printerId),JSON.stringify(data))}catch{} }
+  _saveMaintenanceState(printerId,data){
+    try{localStorage.setItem(this._maintenanceKey(printerId),JSON.stringify(data))}catch{}
+    if(!this._maintRemoteLoaded) return;
+    this._maintCache={...(this._maintCache||{}),[printerId]:data};
+    this._hass?.callWS?.({type:"frontend/set_user_data",key:MAINT_USER_DATA_KEY,value:this._maintCache}).catch((err)=>console.warn("[Bambu Lab Dashboard] Maintenance sync failed",err));
+  }
+  // Merge the maintenance log stored in Home Assistant (per user, all devices) with this browser's local copy.
+  async _loadRemoteMaintenance(){
+    this._maintLoading=true;
+    try{
+      const res=await this._hass.callWS({type:"frontend/get_user_data",key:MAINT_USER_DATA_KEY});
+      const remote=res?.value&&typeof res.value==="object"?res.value:{};
+      const merged={...remote}; let changed=false;
+      // Local copies are merged only on this browser's first sync; afterwards HA is the source of truth (deletions stay deleted).
+      let synced=false; try{ synced=localStorage.getItem(MAINT_SYNCED_KEY)==="1"; }catch{}
+      for(const p of synced?[]:this._printers||[]){
+        let local=null; try{ local=JSON.parse(localStorage.getItem(this._maintenanceKey(p.id))||"null"); }catch{}
+        if(!local) continue;
+        const m=mergeMaintenanceData(remote[p.id],local);
+        if(JSON.stringify(m)!==JSON.stringify(remote[p.id])){ merged[p.id]=m; changed=true; }
+      }
+      this._maintCache=merged; this._maintRemoteLoaded=true;
+      for(const [id,data] of Object.entries(merged)){ try{localStorage.setItem(this._maintenanceKey(id),JSON.stringify(data))}catch{} }
+      if(changed) await this._hass.callWS({type:"frontend/set_user_data",key:MAINT_USER_DATA_KEY,value:merged});
+      try{ localStorage.setItem(MAINT_SYNCED_KEY,"1"); }catch{}
+      this._scheduleRender();
+    }catch(err){
+      console.warn("[Bambu Lab Dashboard] Maintenance sync unavailable, using local storage only",err);
+      this._maintFailed=true;
+    }finally{ this._maintLoading=false; }
+  }
   _maintenanceProfile(printer){
     const raw=normalizedPrinterModel(printer.device);
     const model=raw.replace(/[\s_-]+/g, "");

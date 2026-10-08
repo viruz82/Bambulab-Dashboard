@@ -69,4 +69,15 @@ assert.equal(card._needsRender(realHass,{...realHass,states:{...realHass.states,
 assert.equal(card._needsRender(realHass,{...realHass,states:{...realHass.states,'sensor.p_progress':{...realHass.states['sensor.p_progress'],state:'43'}}}),true);
 assert.equal(card._needsRender(realHass,{...realHass,themes:{darkMode:false}}),true);
 card._lastRenderAt=Date.now()-61000; assert.equal(card._needsRender(realHass,{...realHass}),true);
+// Cost of the last print from energy meter readings at print start/end.
+card._config.kwh_price=0.3; card._config.printers[0].energy_entity='sensor.p_energy';
+card._hass.states['sensor.p_energy']={entity_id:'sensor.p_energy',state:'12',attributes:{unit_of_measurement:'kWh'}};
+card._printCost.set('p',{status:'finish',running:false,startEnergy:10,endEnergy:10.5});
+let energyCost=card._renderEnergy(printer); assert.match(energyCost,/Letzter Druck/); assert.match(energyCost,/0[,.]15 €/); assert.match(energyCost,/Kosten gesamt/); assert.match(energyCost,/energy-stats four/);
+card._printCost.set('p',{status:'running',running:true,startEnergy:11});
+energyCost=card._renderEnergy(printer); assert.match(energyCost,/Aktueller Druck/); assert.match(energyCost,/0[,.]30? €/);
+assert.doesNotMatch(energyCost,/class="control-btn danger" data-entity-action="input_boolean/);
+// Maintenance merge: union of history, latest timestamp per task, earliest init.
+const mm=context.mergeMaintenanceData({history:[{id:'a',ts:1,taskId:'x'}],last:{x:1},initializedAt:5},{history:[{id:'a',ts:1,taskId:'x'},{id:'b',ts:3,taskId:'y'}],last:{x:0,y:3},initializedAt:2});
+assert.equal(mm.history.map(e=>e.id).join(),'a,b'); assert.equal(mm.last.x,1); assert.equal(mm.last.y,3); assert.equal(mm.initializedAt,2);
 console.log('runtime tests: ok');

@@ -123,6 +123,8 @@ Offizielle Bambu-Lab-Wartungsübersicht: https://bambulab.com/en/support/mainten
 
 Das Wartungsbuch zeigt 15 Einträge pro Seite. Es kann nach Wartungsart gefiltert werden; zusätzlich lässt sich die Ansicht auf die letzten 30 Tage begrenzen. Eine kleine Auswertung zeigt Gesamtzahl, Wartungen der letzten 30 Tage und die am häufigsten quittierte Aufgabe. Einzelne Einträge sowie das komplette Logbuch können nach Sicherheitsabfrage gelöscht werden. Das Löschen des Logbuchs ändert bewusst nicht die separat gespeicherten letzten Wartungszeitpunkte und damit auch nicht die nächsten Fälligkeiten.
 
+Wartungsbuch und letzte Wartungszeitpunkte werden über `frontend/set_user_data` in Home Assistant gespeichert und sind damit für denselben Home-Assistant-Benutzer auf allen Geräten gleich. Beim ersten Öffnen auf einem Gerät wird ein vorhandenes lokales Wartungsbuch (Browser-Speicher älterer Versionen) einmalig zusammengeführt; danach ist Home Assistant führend. Der Browser-Speicher bleibt als Offline-Kopie erhalten.
+
 Nach dem Quittieren einer Wartung erscheint eine sichtbare Bestätigung. Die Wartungs- und Quellenbuttons besitzen Hover-, Active- und Tastatur-Fokuszustände, damit auf Desktop klar erkennbar ist, dass die Aktion ausgelöst werden kann.
 
 ## Sprache / Language
@@ -138,6 +140,8 @@ Pro Drucker können im Karteneditor zugeordnet werden:
 - Energie: beliebige `sensor.*`-Entity (`energy_entity`)
 - Idle-Abschaltung: `input_boolean.*` oder `switch.*` (`idle_shutdown_entity`)
 - Zusatzlicht: beliebige `light.*`-Entity (`secondary_light_entity`)
+
+Mit Energiesensor und `kwh_price` zeigt der Energie-Reiter neben den Gesamtkosten auch die Kosten des **aktuellen bzw. letzten Drucks** (inkl. kWh und Datum). Dafür liest das Dashboard aus der Home-Assistant-History den Start und das Ende des letzten Druckauftrags (Statuswechsel der letzten 30 Tage) und den Energiezähler zu diesen Zeitpunkten. Die Leistungskurve wird beim Öffnen mit den letzten 15 Minuten aus der History vorbefüllt.
 
 Beim Ausschalten der Steckdose während eines aktiven Drucks verlangt das Dashboard eine zusätzliche Bestätigung. Smart-Steckdose und Idle-Abschaltung erscheinen im Energie-Reiter nebeneinander, jeweils mit EIN/AUS-Status. Das Dashboard schaltet den Idle-Helper nur um; die eigentliche Abschaltlogik (z. B. Steckdose nach X Minuten Leerlauf aus) liegt in einer Home-Assistant-Automation.
 
@@ -159,7 +163,7 @@ Alternativ eine Panel-View verwenden.
 
 ## Performance
 
-Home Assistant übergibt bei jeder Zustandsänderung irgendeiner Entity ein neues `hass`-Objekt. Das Dashboard merkt sich beim Rendern, welche States es gelesen hat, und rendert nur neu, wenn sich einer davon ändert (zusätzlich bei Theme-, Sprach- oder Registry-Änderungen und spätestens nach 60 Sekunden). Der Kamera-Stream bleibt über Neuaufbauten hinweg bestehen und wird nur bei Wechsel der Kamera-Entity oder über den Aktualisieren-Button neu verbunden – auch dann nicht, wenn Home Assistant den Kamera-Access-Token rotiert.
+Home Assistant übergibt bei jeder Zustandsänderung irgendeiner Entity ein neues `hass`-Objekt. Das Dashboard merkt sich beim Rendern, welche States es gelesen hat, und rendert nur neu, wenn sich einer davon ändert (zusätzlich bei Theme-, Sprach- oder Registry-Änderungen und spätestens nach 60 Sekunden). Der Kamera-Stream bleibt über Neuaufbauten hinweg bestehen und wird nur bei Wechsel der Kamera-Entity oder über den Aktualisieren-Button neu verbunden – auch dann nicht, wenn Home Assistant den Kamera-Access-Token rotiert. Neue oder geänderte Geräte/Entities werden über Registry-Events sofort erkannt statt per Polling (Fallback alle 10 Minuten).
 
 ## Validierung
 
@@ -167,7 +171,7 @@ Home Assistant übergibt bei jeder Zustandsänderung irgendeiner Entity ein neue
 npm run validate
 ```
 
-Die Tests prüfen Syntax, Discovery, Entity-Zuordnung, Steuerungs-Rendering, Hybrid-Warnung, aktives Filament, Zusatzlicht, Idle-Abschaltung, Endzeit, Render-Drosselung und Custom-Element-Registrierung. Ein echter End-to-End-Schaltversuch am physischen Drucker kann nur in der jeweiligen Home-Assistant-Installation erfolgen.
+Die Tests prüfen Syntax, Discovery, Entity-Zuordnung, Steuerungs-Rendering, Hybrid-Warnung, aktives Filament, Zusatzlicht, Idle-Abschaltung, Endzeit, Druckkosten, Wartungsbuch-Zusammenführung, Render-Drosselung und Custom-Element-Registrierung. Ein echter End-to-End-Schaltversuch am physischen Drucker kann nur in der jeweiligen Home-Assistant-Installation erfolgen.
 
 ## Lizenz
 

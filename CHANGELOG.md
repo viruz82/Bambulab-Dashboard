@@ -7,6 +7,10 @@
 - Optionale Idle-Abschaltung (`idle_shutdown_entity`, `input_boolean`/`switch`) im Energie-Reiter neben der Smart-Steckdose.
 - Performance: Neu gerendert wird nur noch, wenn sich ein tatsächlich angezeigter State ändert (statt bei jeder Zustandsänderung in Home Assistant).
 - Kamera-Stream bleibt über Neuaufbauten bestehen und verbindet sich nicht mehr bei jedem Update bzw. Token-Wechsel neu.
+- Energie-Reiter: Kosten und kWh des aktuellen bzw. letzten Drucks aus der Home-Assistant-History; Leistungskurve beim Öffnen aus der History vorbefüllt.
+- Wartungsbuch wird geräteübergreifend in Home Assistant gespeichert (`frontend/set_user_data`); bestehende lokale Wartungsbücher werden beim ersten Öffnen zusammengeführt.
+- Geräteerkennung reagiert auf Registry-Events statt alle 60 Sekunden die komplette Registry abzufragen.
+- Idle-Abschaltung: „Aus“-Button nicht mehr rot markiert.
 - Doku: vollständiges YAML-Beispiel und Hinweis zu `grid_options: columns: full` für die breite Desktop-Ansicht.
 
 ## 1.8.3
