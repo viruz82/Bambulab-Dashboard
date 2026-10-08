@@ -33,6 +33,24 @@ Die Gesamtlaufzeit ist nur Information und löst keine Wartung aus. Hersteller-/
 type: custom:bambu-lab-dashboard
 ```
 
+Vollständiges Beispiel mit optionalen Zuordnungen pro Drucker:
+
+```yaml
+type: custom:bambu-lab-dashboard
+kwh_price: 0.33
+grid_options:
+  columns: full
+printers:
+  - device_id: <Geräte-ID des Druckers>
+    name: A1 Combo
+    smart_plug_entity: switch.drucker_steckdose
+    power_entity: sensor.drucker_steckdose_power
+    energy_entity: sensor.drucker_steckdose_energy
+    secondary_light_entity: light.drucker_led        # optional: „Licht 2“ in den Quick Controls
+    idle_shutdown_entity: input_boolean.drucker_idle  # optional: Idle-Abschaltung im Energie-Reiter
+    end_time_entity: sensor.drucker_endzeit           # optional, nur falls die automatische Erkennung nicht passt
+```
+
 ## Funktionen in v1.8.3
 
 - Mehrere Bambu-Drucker automatisch erkennen.
@@ -115,11 +133,33 @@ Die Dashboard-Oberfläche übernimmt automatisch die Sprache von Home Assistant.
 
 Pro Drucker können im Karteneditor zugeordnet werden:
 
-- Smart-Steckdose: `switch.*`
-- Leistung: beliebige `sensor.*`-Entity
-- Energie: beliebige `sensor.*`-Entity
+- Smart-Steckdose: `switch.*` (`smart_plug_entity`)
+- Leistung: beliebige `sensor.*`-Entity (`power_entity`)
+- Energie: beliebige `sensor.*`-Entity (`energy_entity`)
+- Idle-Abschaltung: `input_boolean.*` oder `switch.*` (`idle_shutdown_entity`)
+- Zusatzlicht: beliebige `light.*`-Entity (`secondary_light_entity`)
 
-Beim Ausschalten der Steckdose während eines aktiven Drucks verlangt das Dashboard eine zusätzliche Bestätigung.
+Beim Ausschalten der Steckdose während eines aktiven Drucks verlangt das Dashboard eine zusätzliche Bestätigung. Smart-Steckdose und Idle-Abschaltung erscheinen im Energie-Reiter nebeneinander, jeweils mit EIN/AUS-Status. Das Dashboard schaltet den Idle-Helper nur um; die eigentliche Abschaltlogik (z. B. Steckdose nach X Minuten Leerlauf aus) liegt in einer Home-Assistant-Automation.
+
+## Breite / Layout
+
+In einer Sections-View meldet die Karte standardmäßig 12 Grid-Spalten. Das entspricht **einer** Section-Spalte, auch wenn die Section selbst breiter ist. Für die breite Desktop-Ansicht mit Seitennavigation deshalb beides setzen:
+
+```yaml
+sections:
+  - type: grid
+    column_span: 4          # Section über mehrere Spalten
+    cards:
+      - type: custom:bambu-lab-dashboard
+        grid_options:
+          columns: full     # Karte über die volle Section-Breite
+```
+
+Alternativ eine Panel-View verwenden.
+
+## Performance
+
+Home Assistant übergibt bei jeder Zustandsänderung irgendeiner Entity ein neues `hass`-Objekt. Das Dashboard merkt sich beim Rendern, welche States es gelesen hat, und rendert nur neu, wenn sich einer davon ändert (zusätzlich bei Theme-, Sprach- oder Registry-Änderungen und spätestens nach 60 Sekunden). Der Kamera-Stream bleibt über Neuaufbauten hinweg bestehen und wird nur bei Wechsel der Kamera-Entity oder über den Aktualisieren-Button neu verbunden – auch dann nicht, wenn Home Assistant den Kamera-Access-Token rotiert.
 
 ## Validierung
 
@@ -127,7 +167,7 @@ Beim Ausschalten der Steckdose während eines aktiven Drucks verlangt das Dashbo
 npm run validate
 ```
 
-Die Tests prüfen Syntax, Discovery, Entity-Zuordnung, Steuerungs-Rendering, Hybrid-Warnung, aktives Filament und Custom-Element-Registrierung. Ein echter End-to-End-Schaltversuch am physischen Drucker kann nur in der jeweiligen Home-Assistant-Installation erfolgen.
+Die Tests prüfen Syntax, Discovery, Entity-Zuordnung, Steuerungs-Rendering, Hybrid-Warnung, aktives Filament, Zusatzlicht, Idle-Abschaltung, Endzeit, Render-Drosselung und Custom-Element-Registrierung. Ein echter End-to-End-Schaltversuch am physischen Drucker kann nur in der jeweiligen Home-Assistant-Installation erfolgen.
 
 ## Lizenz
 

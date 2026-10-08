@@ -22,8 +22,8 @@ Für die Druckererkennung sind keine Entity-IDs nötig.
 
 ## 4. Karteneditor
 
-Im visuellen Editor können Theme, Reihenfolge, Name, AMS-Zuordnung, Leistungs-/Energiesensoren und optionale Entity-Overrides konfiguriert werden.
+Im visuellen Editor können Theme, Reihenfolge, Name, AMS-Zuordnung, Smart-Steckdose, Leistungs-/Energiesensoren, Zusatzlicht, Idle-Abschaltung und optionale Entity-Overrides (z. B. Endzeit) konfiguriert werden.
 
 ## 5. Breite
 
-Die Karte nutzt 100 % ihrer von Home Assistant zugewiesenen Section-Breite. Soll sie breiter sein, muss die Section/View entsprechend breit eingestellt werden.
+Die Karte meldet in einer Sections-View standardmäßig 12 Grid-Spalten, also eine Section-Spalte. Für die breite Desktop-Ansicht die Section verbreitern (`column_span`) **und** der Karte `grid_options: columns: full` geben – siehe README, Abschnitt „Breite / Layout“. Alternativ eine Panel-View verwenden.

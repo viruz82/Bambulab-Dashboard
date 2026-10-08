@@ -1,5 +1,14 @@
 # Changelog
 
+## Unveröffentlicht
+
+- Endzeit des aktiven Druckauftrags in der Übersicht (`end_time_entity` als optionaler Override).
+- Optionales Zusatzlicht (`secondary_light_entity`) als „Licht 2“ in den Quick Controls; Licht-Buttons zeigen ihren EIN/AUS-Status.
+- Optionale Idle-Abschaltung (`idle_shutdown_entity`, `input_boolean`/`switch`) im Energie-Reiter neben der Smart-Steckdose.
+- Performance: Neu gerendert wird nur noch, wenn sich ein tatsächlich angezeigter State ändert (statt bei jeder Zustandsänderung in Home Assistant).
+- Kamera-Stream bleibt über Neuaufbauten bestehen und verbindet sich nicht mehr bei jedem Update bzw. Token-Wechsel neu.
+- Doku: vollständiges YAML-Beispiel und Hinweis zu `grid_options: columns: full` für die breite Desktop-Ansicht.
+
 ## 1.8.3
 
 - Deutsch/Englisch vollständig gegen die tatsächlich sichtbaren Dashboard-, Editor-, Popup-, Wartungs- und Bestätigungstexte gegengeprüft und fehlende englische Übersetzungen ergänzt.
