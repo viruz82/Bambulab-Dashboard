@@ -61,4 +61,12 @@ const energyIdleOnly=card._renderEnergy(printer);
 assert.match(energyIdleOnly,/Leerlaufabschaltung/); assert.doesNotMatch(energyIdleOnly,/Keine Smart-Steckdose/);
 card._config.printers[0].smart_plug_entity='switch.smart_plug';
 assert.match(card._renderActiveFilament(printer),/Bambu PETG/); assert.match(card._renderActiveFilament(printer),/66%/);
+// Render gating: only states read during the last render trigger a new render.
+card._loaded=true; card._config.theme=undefined; const realHass=card._hass; card._render();
+assert.equal(card._hass,realHass);
+assert.ok(card._renderedStates.has('sensor.p_progress'));
+assert.equal(card._needsRender(realHass,{...realHass,states:{...realHass.states,'sensor.unrelated':{state:'1'}}}),false);
+assert.equal(card._needsRender(realHass,{...realHass,states:{...realHass.states,'sensor.p_progress':{...realHass.states['sensor.p_progress'],state:'43'}}}),true);
+assert.equal(card._needsRender(realHass,{...realHass,themes:{darkMode:false}}),true);
+card._lastRenderAt=Date.now()-61000; assert.equal(card._needsRender(realHass,{...realHass}),true);
 console.log('runtime tests: ok');

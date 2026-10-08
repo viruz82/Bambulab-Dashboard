@@ -962,7 +962,8 @@ class BambuLabDashboard extends HTMLElement {
     this._powerSamples = new Map();
     this._lastPowerSampleAt = new Map();
     this._selectedSpoolEntityId = null;
-    this._lastRenderSignature = "";
+    this._renderedStates = null;
+    this._lastRenderAt = 0;
     this._mobileTouchActive = false;
     this._renderDirtyDuringTouch = false;
     this._touchGuardBound = false;
@@ -981,7 +982,7 @@ class BambuLabDashboard extends HTMLElement {
     if (!this._loaded && !this._loading) this._discover();
     if (this._loaded) {
       this._samplePower();
-      if (previous !== hass) {
+      if (previous !== hass && this._needsRender(previous, hass)) {
         if (this._mobileTouchActive) this._renderDirtyDuringTouch = true;
         else this._scheduleRender();
       }
@@ -1261,6 +1262,16 @@ class BambuLabDashboard extends HTMLElement {
     }));
   }
 
+  // HA hands over a new hass object whenever any entity in the system changes.
+  // Only re-render when a state this card actually read during its last render changed.
+  _needsRender(previous, hass) {
+    if (!previous || !this._renderedStates) return true;
+    if (hass.entities !== previous.entities || hass.themes !== previous.themes || hass.language !== previous.language || hass.locale !== previous.locale) return true;
+    if (Date.now() - this._lastRenderAt > 60000) return true;
+    for (const [id, st] of this._renderedStates) if (hass.states?.[id] !== st) return true;
+    return false;
+  }
+
   _scheduleRender() {
     if (this._renderPending) return;
     this._renderPending = true;
@@ -1270,9 +1281,25 @@ class BambuLabDashboard extends HTMLElement {
   _render() {
     if (!this.shadowRoot) return;
     const scrollState = this._captureScrollState();
-    const body = this._renderBody();
-    this.shadowRoot.innerHTML = `<style>${styles}</style>${body}<div class="overlay-theme ${this._themeClass()}">${this._renderMaintenanceModal()}${this._renderSelectedSpoolDetail()}</div>`;
-    applyUiTranslations(this.shadowRoot,this._hass);
+    const oldCamera = this.shadowRoot.querySelector("img[data-camera-key]");
+    const realHass = this._hass;
+    const accessed = new Map();
+    if (realHass?.states) {
+      const states = realHass.states;
+      this._hass = { ...realHass, states: new Proxy(states, { get: (target, key) => { const value = target[key]; if (typeof key === "string") accessed.set(key, value); return value; } }) };
+    }
+    try {
+      const body = this._renderBody();
+      this.shadowRoot.innerHTML = `<style>${styles}</style>${body}<div class="overlay-theme ${this._themeClass()}">${this._renderMaintenanceModal()}${this._renderSelectedSpoolDetail()}</div>`;
+      applyUiTranslations(this.shadowRoot,this._hass);
+    } finally {
+      this._hass = realHass;
+    }
+    this._renderedStates = realHass?.states ? accessed : null;
+    this._lastRenderAt = Date.now();
+    // Keep the running camera stream instead of reconnecting it on every render (the access token rotates, so compare entity + refresh key only).
+    const newCamera = this.shadowRoot.querySelector("img[data-camera-key]");
+    if (oldCamera && newCamera && oldCamera.dataset.cameraKey === newCamera.dataset.cameraKey) newCamera.replaceWith(oldCamera);
     this._bindEvents();
     this._restoreScrollState(scrollState);
   }
@@ -1499,7 +1526,7 @@ class BambuLabDashboard extends HTMLElement {
     const camSwitch=this._controlEntity(printer,"cameraSwitch");
     const imgSwitch=this._controlEntity(printer,"imageCameraSwitch");
     const diag=reg?`<div class="control-warning" style="margin-top:0"><strong>Kamera-Diagnose</strong><div class="capability-list"><div class="capability-row"><span>Entity</span><code>${cssEscape(reg.entity_id)}</code></div><div class="capability-row"><span>HA-Status</span><code>${cssEscape(st?.state||"unbekannt")}</code></div><div class="capability-row"><span>Access-Token</span><code>${st?.attributes?.access_token?"vorhanden":"fehlt"}</code></div></div><div style="margin-top:8px"><button class="maint-source-link" data-more-info="${cssEscape(reg.entity_id)}">In Home Assistant öffnen</button></div></div>`:"";
-    return `<section class="panel camera-panel"><div class="panel-head"><div><div class="eyebrow">Live Camera</div><div class="panel-title">Kamera</div></div></div><div class="camera-wrap">${cameraUrl ? `<img src="${cameraUrl}" alt="Live-Kamera von ${cssEscape(displayName(printer.device))}">` : `<div class="camera-empty"><ha-icon icon="mdi:cctv-off"></ha-icon>Keine Kamera-Entität verfügbar oder Kamera nicht aktiviert.</div>`}<div class="camera-actions"><button class="icon-btn" data-action="refresh-camera" title="Kamera aktualisieren"><ha-icon icon="mdi:refresh"></ha-icon></button></div></div>${diag}${(camSwitch||imgSwitch)?`<div class="control-groups" style="padding-top:0">${camSwitch?`<button class="toggle-row ${normalize(this._hass?.states?.[camSwitch.entity_id]?.state)==="on"?"on":""}" data-entity-action="${cssEscape(camSwitch.entity_id)}"><span>Kamera aktiv</span><strong>${normalize(this._hass?.states?.[camSwitch.entity_id]?.state)==="on"?"EIN":"AUS"}</strong></button>`:""}${imgSwitch?`<button class="toggle-row ${normalize(this._hass?.states?.[imgSwitch.entity_id]?.state)==="on"?"on":""}" data-entity-action="${cssEscape(imgSwitch.entity_id)}"><span>Einzelbild-Modus</span><strong>${normalize(this._hass?.states?.[imgSwitch.entity_id]?.state)==="on"?"EIN":"AUS"}</strong></button>`:""}</div>`:""}</section>`;
+    return `<section class="panel camera-panel"><div class="panel-head"><div><div class="eyebrow">Live Camera</div><div class="panel-title">Kamera</div></div></div><div class="camera-wrap">${cameraUrl ? `<img data-camera-key="${cssEscape(`${reg.entity_id}|${this._cameraBust}`)}" src="${cameraUrl}" alt="Live-Kamera von ${cssEscape(displayName(printer.device))}">` : `<div class="camera-empty"><ha-icon icon="mdi:cctv-off"></ha-icon>Keine Kamera-Entität verfügbar oder Kamera nicht aktiviert.</div>`}<div class="camera-actions"><button class="icon-btn" data-action="refresh-camera" title="Kamera aktualisieren"><ha-icon icon="mdi:refresh"></ha-icon></button></div></div>${diag}${(camSwitch||imgSwitch)?`<div class="control-groups" style="padding-top:0">${camSwitch?`<button class="toggle-row ${normalize(this._hass?.states?.[camSwitch.entity_id]?.state)==="on"?"on":""}" data-entity-action="${cssEscape(camSwitch.entity_id)}"><span>Kamera aktiv</span><strong>${normalize(this._hass?.states?.[camSwitch.entity_id]?.state)==="on"?"EIN":"AUS"}</strong></button>`:""}${imgSwitch?`<button class="toggle-row ${normalize(this._hass?.states?.[imgSwitch.entity_id]?.state)==="on"?"on":""}" data-entity-action="${cssEscape(imgSwitch.entity_id)}"><span>Einzelbild-Modus</span><strong>${normalize(this._hass?.states?.[imgSwitch.entity_id]?.state)==="on"?"EIN":"AUS"}</strong></button>`:""}</div>`:""}</section>`;
   }
 
   _renderAMS(printer) {
