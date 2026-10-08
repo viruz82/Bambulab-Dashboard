@@ -854,8 +854,10 @@ const styles = `
     .side-printers .side-label { display:none; }
     .printer-switch { display:flex; min-width:max-content; }
     .printer-switch .tab { width:auto; }
-    .mobile-nav { display:flex; overflow-x:auto; overflow-y:hidden; gap:6px; padding:3px 0 10px; scrollbar-width:none; -webkit-overflow-scrolling:touch; touch-action:pan-x; overscroll-behavior-x:contain; position:relative; z-index:5; }
-    .mobile-nav .nav-btn { width:auto; flex:0 0 auto; padding:8px 10px; }
+    .mobile-nav { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; padding:3px 0 10px; position:relative; z-index:5; }
+    .mobile-nav .nav-btn { width:auto; min-width:0; flex-direction:column; justify-content:center; gap:4px; padding:8px 4px; text-align:center; }
+    .mobile-nav .nav-btn span { max-width:100%; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .mobile-nav .nav-btn.active { box-shadow:inset 0 -3px 0 var(--bd-accent); }
     .workspace-head { align-items:flex-start; }
     .workspace-title p { display:none; }
     .wide-grid { grid-template-columns:1fr; }
@@ -1435,7 +1437,9 @@ class BambuLabDashboard extends HTMLElement {
   }
 
   _renderNav(mobile = false) {
-    return `<div class="${mobile ? "mobile-nav" : "nav"}">${this._navItems().map(([id,icon,label]) => `<button class="nav-btn ${this._activeView === id ? "active" : ""}" data-view="${id}"><ha-icon icon="${icon}"></ha-icon><span>${label}</span></button>`).join("")}</div>`;
+    // Mobile: all four tabs side by side (no horizontal scrolling that a re-render would reset), so the long label gets a short form.
+    const shortLabels = { detail: "Details" };
+    return `<div class="${mobile ? "mobile-nav" : "nav"}">${this._navItems().map(([id,icon,label]) => `<button class="nav-btn ${this._activeView === id ? "active" : ""}" data-view="${id}"><ha-icon icon="${icon}"></ha-icon><span>${mobile && shortLabels[id] ? shortLabels[id] : label}</span></button>`).join("")}</div>`;
   }
 
   _renderPrinterOverviewCard(printer) {

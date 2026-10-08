@@ -7,6 +7,7 @@
 - Kamera-Stream bleibt über Neuaufbauten bestehen und verbindet sich nicht mehr bei jedem Update bzw. Token-Wechsel neu.
 - Energie-Reiter: Kosten und kWh des aktuellen bzw. letzten Drucks aus der Home-Assistant-History; Leistungskurve beim Öffnen aus der History vorbefüllt.
 - Wartungsbuch wird geräteübergreifend in Home Assistant gespeichert (`frontend/set_user_data`); bestehende lokale Wartungsbücher werden beim ersten Öffnen zusammengeführt.
+- Mobile Navigation: alle vier Reiter nebeneinander (Icon über Text) statt horizontal scrollbarer Leiste, die bei jedem Neuaufbau wieder nach links sprang.
 - Geräteerkennung reagiert auf Registry-Events statt alle 60 Sekunden die komplette Registry abzufragen.
 - Doku: vollständiges YAML-Beispiel inkl. Zusatzlicht/Idle-Abschaltung/Endzeit und Hinweis zu `grid_options: columns: full` für die breite Desktop-Ansicht.
 
