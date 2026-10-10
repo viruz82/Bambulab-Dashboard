@@ -590,6 +590,7 @@ const styles = `
   .control-group-title { color:var(--bd-muted); font-size:10px; letter-spacing:.1em; text-transform:uppercase; font-weight:800; }
   .control-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
   .control-field { border:1px solid var(--bd-border); border-radius:12px; padding:10px; background:rgba(255,255,255,.02); }
+  .control-field small { display:block; margin-top:6px; color:var(--bd-muted); font-size:10px; overflow-wrap:anywhere; }
   .control-field label { display:block; color:var(--bd-muted); font-size:10px; margin-bottom:6px; }
   .control-field input,.control-field select { width:100%; min-height:36px; border-radius:9px; border:1px solid var(--bd-border); background:#0b120e; color:var(--bd-text); padding:0 8px; }
   .fan-control-row { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; }
@@ -837,7 +838,12 @@ const styles = `
   .overview-main,.overview-side { display:grid; gap:14px; min-width:0; }
   .wide-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
   .mobile-nav { display:none; }
-  .hero-body { grid-template-columns:minmax(180px,.85fr) minmax(175px,.7fr) minmax(240px,1.2fr); }
+  /* Status panel: wrap by the panel's own width (the card-width container queries let the three columns overflow a narrow panel) */
+  .hero-body { display:flex; flex-wrap:wrap; }
+  .hero-body > * { min-width:0; }
+  .hero-body .printer-visual { flex:1 1 180px; }
+  .hero-body .progress-wrap { flex:1 1 160px; }
+  .hero-body .task { flex:1 1 240px; }
   .shell { width:100%; max-width:none; margin:0; }
   @container (max-width: 1050px) {
     .app-grid { grid-template-columns:170px minmax(0,1fr); gap:12px; }
